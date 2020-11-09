@@ -1,0 +1,73 @@
+CREATE TABLE temp_user_act(user_id int,
+dates date)
+--1.1用用户活跃日期表做自连接，连接方式使用左连接，连接字段使用“用户id”字段，保留两表的用户id与两表的日期
+SELECT a.user_id,b.user_id,a.dates,b.dates FROM temp_user_act a LEFT join temp_user_act b on a.user_id=b.user_id
+--筛选出右表日期大于或等于左表日期的内容（a左，b右）
+CREATE VIEW temp AS SELECT
+a.user_id user_zuo,
+b.user_id user_you,
+a.dates dates_zuo,
+b.dates dates_you
+FROM
+ temp_user_act a
+ LEFT JOIN temp_user_act b ON a.user_id =b.user_id
+SELECT * from temp where dates_you>=dates_zuo
+--计算以左表日期为基准日的当日用户数，第二日回访用户数，第三日回访用户数，第四日回访用户数，第八日回访用户数；
+SELECT
+  a.dates_zuo,
+	count( a.user_zuo ) '当日回访',
+	count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 1, a.user_zuo, NULL )) '第二日回访',
+	count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 2, a.user_zuo, NULL )) '第三日回访',
+	count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 3, a.user_zuo, NULL )) '第四日回访',
+	count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 7, a.user_zuo, NULL )) '第八日回访' 
+FROM
+	temp a
+	GROUP BY a.dates_zuo
+--利用上述数据计算出每日的当日用户数以及次日留存率，二日留存率，三日留存率，7日留存率(率需要使用百分比表示结果)；
+CREATE VIEW temp4 as
+SELECT
+  a.dates_zuo,
+	concat(TRUNCATE (count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 1, a.user_zuo, NULL ))/count( a.user_zuo )  *100,2),'%') '1日留存率',
+	concat(TRUNCATE (count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 2, a.user_zuo, NULL ))/count( a.user_zuo )  *100,2),'%')'2日留存率',
+	concat(TRUNCATE (count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 3, a.user_zuo, NULL ))/count( a.user_zuo )  *100,2),'%')'3日留存率',
+	concat(TRUNCATE (count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 7, a.user_zuo, NULL ))/count( a.user_zuo )  *100,2),'%')'7日留存率' 
+FROM
+	temp a
+	GROUP BY a.dates_zuo
+--concat(truncate(royalties *100,2),'%')) 
+--求出每日的次留与次留的周环比
+SELECT
+	temp4.dates_zuo,
+	concat(TRUNCATE (count(
+	DISTINCT
+	IF
+	( datediff( a.dates_zuo, a.dates_you )= 1, a.user_zuo, NULL ))/count( a.user_zuo )  *100,2),'%') '1日留存率'
+	lead(1日留存率, 7, NULL ) over ( ) lead3 
+FROM
+	temp4
+GROUP BY
+	temp4.dates_zuo
